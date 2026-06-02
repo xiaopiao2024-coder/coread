@@ -45,13 +45,22 @@ npm start       # 启动服务器
 }
 ```
 
-### claude.ai / 远程MCP（SSE）
+### claude.ai / 远程MCP（SSE + Streamable HTTP）
 
-把服务器部署到有公网IP的VPS上，然后在claude.ai设置里添加为远程MCP服务器。
+```bash
+npm run mcp:sse   # 启动SSE/HTTP MCP服务器（默认端口3001）
+```
+
+SSE端点：`http://你的服务器:3001/sse`
+Streamable HTTP端点：`http://你的服务器:3001/mcp`
+
+环境变量 `COREAD_MCP_PORT` 可以改端口。
+
+在claude.ai设置里添加为远程MCP服务器即可。支持SSE和Streamable HTTP两种传输模式。
 
 ### 其他MCP客户端
 
-任何支持MCP stdio传输的客户端都能用——不限于Claude。GPT、DeepSeek、Gemini，支持MCP的都行。
+任何支持MCP的客户端都能用——不限于Claude。GPT、DeepSeek、Gemini，支持MCP的都行。三种传输模式可选：stdio、SSE、Streamable HTTP。
 
 ## MCP工具列表
 
@@ -72,7 +81,8 @@ npm start       # 启动服务器
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `COREAD_PORT` | `3000` | 服务器端口 |
+| `COREAD_PORT` | `3000` | Web服务器端口 |
+| `COREAD_MCP_PORT` | `3001` | MCP SSE/HTTP服务器端口 |
 | `COREAD_DB` | `./data/coread.db` | 数据库路径 |
 
 ## 开发
@@ -87,6 +97,7 @@ npm start       # 生产模式（提供构建好的前端）
 ```
 server.mjs        — HTTP服务器：API + 静态文件
 mcp-stdio.mjs     — MCP服务器（stdio传输）
+mcp-sse.mjs       — MCP服务器（SSE + Streamable HTTP传输）
 lib/
   db.mjs           — SQLite数据库初始化
   epub.mjs         — Epub解析器（章节、图片、封面）
@@ -121,7 +132,9 @@ npm start
 
 Open `http://localhost:3000` in your browser.
 
-### MCP Setup (Claude Code)
+### MCP Setup
+
+**Claude Code (stdio):**
 
 ```json
 {
@@ -134,7 +147,16 @@ Open `http://localhost:3000` in your browser.
 }
 ```
 
-Works with any MCP-compatible client — not limited to Claude.
+**claude.ai / Remote MCP (SSE + Streamable HTTP):**
+
+```bash
+npm run mcp:sse   # Starts SSE/HTTP MCP server on port 3001
+```
+
+- SSE endpoint: `http://your-server:3001/sse`
+- Streamable HTTP endpoint: `http://your-server:3001/mcp`
+
+Works with any MCP-compatible client — not limited to Claude. Three transport modes: stdio, SSE, Streamable HTTP.
 
 ## License
 
