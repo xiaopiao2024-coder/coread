@@ -507,8 +507,8 @@ const StudyApp: React.FC = () => {
             const measurer = measureRef.current;
             measurer.innerHTML = '';
             measurer.style.width = `${readerContentWidth}px`;
-            const maxHeight = readerSize.height;
-            setPageHeight(maxHeight);
+            const maxHeight = Math.max(100, readerSize.height - 8);
+            setPageHeight(readerSize.height);
 
             const breaks: PageBreak[] = [{ paraIndex: 0, offset: 0 }];
             let paraIndex = 0;
