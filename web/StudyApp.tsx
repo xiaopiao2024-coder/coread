@@ -409,30 +409,46 @@ const StudyApp: React.FC = () => {
         api.fetchBookToc(book.id).then(d => setTocChapters(d.chapters || [])).catch(() => {});
     };
 
+    const lockedHeightRef = useRef<number>(0);
     useLayoutEffect(() => {
         if (mode !== 'reading' || !contentRef.current) return;
         const el = contentRef.current;
         let frame = 0;
-        const update = () => {
+        const update = (force?: boolean) => {
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(() => {
                 const width = Math.round(el.clientWidth);
-                const height = Math.max(0, Math.round(el.clientHeight - READER_VERTICAL_PADDING_STATIC - getSafeAreaBottom()));
+                const rawH = Math.min(el.clientHeight, window.innerHeight);
+                const height = Math.max(0, Math.round(rawH - READER_VERTICAL_PADDING_STATIC - getSafeAreaBottom()));
+                if (lockedHeightRef.current === 0 || force) {
+                    lockedHeightRef.current = height;
+                }
+                const stableH = Math.max(height, lockedHeightRef.current);
                 setReaderSize(prev => {
-                    if (prev.width === width && prev.height === height) return prev;
-                    if (prev.height > 0 && height < prev.height * 0.8 && width === prev.width) return prev;
-                    return { width, height };
+                    if (prev.width === width && prev.height === stableH) return prev;
+                    return { width, height: stableH };
                 });
             });
         };
-        update();
-        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+        update(true);
+        const onResize = () => {
+            const rawH = Math.min(el.clientHeight, window.innerHeight);
+            const h = Math.max(0, Math.round(rawH - READER_VERTICAL_PADDING_STATIC - getSafeAreaBottom()));
+            if (h >= lockedHeightRef.current * 0.95) {
+                update(true);
+            } else {
+                const width = Math.round(el.clientWidth);
+                setReaderSize(prev => prev.width === width ? prev : { width, height: prev.height });
+            }
+        };
+        const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => onResize()) : null;
         ro?.observe(el);
-        window.addEventListener('resize', update);
+        window.addEventListener('resize', onResize);
         return () => {
             cancelAnimationFrame(frame);
             ro?.disconnect();
-            window.removeEventListener('resize', update);
+            window.removeEventListener('resize', onResize);
+            lockedHeightRef.current = 0;
         };
     }, [mode]);
 
