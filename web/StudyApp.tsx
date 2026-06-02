@@ -79,6 +79,9 @@ function getSafeAreaBottom(): number {
     return h;
 }
 const READER_HORIZONTAL_PADDING = 56;
+function decodeEntities(s: string): string {
+    return s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
 const PARA_GAP = 18;
 const CHAPTER_GAP_TOP = 40;
 const CHAPTER_GAP_BOTTOM = 28;
@@ -147,6 +150,15 @@ const StudyApp: React.FC = () => {
     const [selectedBooks, setSelectedBooks] = useState<Set<number>>(new Set());
     const batchFileRef = useRef<HTMLInputElement>(null);
     const [showBar, setShowBar] = useState(false);
+    const [humanName, setHumanName] = useState(() => localStorage.getItem('coread-human-name') || 'human');
+    const [aiName, setAiName] = useState(() => localStorage.getItem('coread-ai-name') || 'AI');
+    const [showSettings, setShowSettings] = useState(false);
+    const displayName = (from: string) => {
+        const lower = from.toLowerCase();
+        if (lower === 'human' || lower === humanName.toLowerCase()) return humanName;
+        if (lower === 'ai' || lower === aiName.toLowerCase()) return aiName;
+        return from;
+    };
     const barTimer = useRef<any>(null);
     const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
 
@@ -648,7 +660,7 @@ const StudyApp: React.FC = () => {
         if (!activeBook || commentingIdx === null || !commentText.trim()) return;
         try {
             const result = await api.addBookComment(activeBook.id, {
-                paragraph_idx: commentingIdx, content: commentText.trim(), from_who: 'human',
+                paragraph_idx: commentingIdx, content: commentText.trim(), from_who: humanName,
                 selected_text: selectedText || undefined,
                 sel_start_idx: selRange ? selRange.start : undefined,
                 sel_end_idx: selRange ? selRange.end : undefined,
@@ -659,7 +671,7 @@ const StudyApp: React.FC = () => {
                 id: result?.id ?? Date.now(), book_id: activeBook.id, paragraph_idx: commentingIdx,
                 sel_start_idx: selRange?.start ?? null, sel_end_idx: selRange?.end ?? null,
                 sel_end_para_idx: selRange && selRange.endPara !== selRange.startPara ? selRange.endPara : null,
-                selected_text: selectedText || null, from_who: 'human',
+                selected_text: selectedText || null, from_who: humanName,
                 content: commentText.trim(), created_at: new Date().toISOString(), reply_to: replyingTo?.id ?? null,
             };
             const pageToRestore = replyPageRef.current ?? page;
@@ -823,7 +835,7 @@ const StudyApp: React.FC = () => {
             if (start >= end) continue;
             if (start > lastEnd) parts.push(<React.Fragment key={`t${paraIdx}-${lastEnd}`}>{text.slice(lastEnd, start)}</React.Fragment>);
 
-            const isShen = h.from_who === 'ai' || h.from_who === 'AI';
+            const isShen = h.from_who.toLowerCase() === 'ai' || h.from_who.toLowerCase() === aiName.toLowerCase();
             const hlBg = isShen ? c.shenHL : c.tongHL;
             const dotColor = isShen ? c.shenColor : c.tongColor;
 
@@ -904,6 +916,9 @@ const StudyApp: React.FC = () => {
                     )}
                     <button onClick={() => { setEditMode(!editMode); setSelectedBooks(new Set()); }} style={btnBase}>
                         <span style={{ fontSize: 12, color: editMode ? '#e55' : c.primary, fontWeight: 600 }}>{editMode ? '完成' : '管理'}</span>
+                    </button>
+                    <button onClick={() => setShowSettings(true)} style={btnBase}>
+                        <span style={{ fontSize: 14, color: c.primary }}>⚙</span>
                     </button>
                     <button onClick={() => setShowUpload(true)} style={btnBase}>
                         <span style={{ fontSize: 20, color: c.primary, lineHeight: 1 }}>+</span>
@@ -1073,13 +1088,13 @@ const StudyApp: React.FC = () => {
                                                 textAlign: chapterTitle ? 'center' : undefined,
                                                 userSelect: 'text', WebkitUserSelect: 'text', whiteSpace: 'pre-wrap',
                                             } as any}>
-                                                {renderHighlighted(frag.content, frag.idx, inlineComments)}
+                                                {renderHighlighted(decodeEntities(frag.content), frag.idx, inlineComments)}
                                             </div>
 
                                             {blockComments.length > 0 && (
                                                 <div style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                                     {blockComments.filter(x => !x.reply_to).map(cmt => {
-                                                        const isShen = cmt.from_who === 'ai' || cmt.from_who === 'AI';
+                                                        const isShen = cmt.from_who.toLowerCase() === 'ai' || cmt.from_who.toLowerCase() === aiName.toLowerCase();
                                                         const color = isShen ? c.shenColor : c.tongColor;
                                                         return (
                                                             <span key={cmt.id} onClick={(e) => { e.stopPropagation(); const allR: Comment[] = []; const findR = (ids: number[]) => { const f = comments.filter(r => r.reply_to && ids.includes(r.reply_to)); if (f.length) { allR.push(...f); findR(f.map(x => x.id)); } }; findR([cmt.id]); setActiveComments(prev => prev.length > 0 && prev[0]?.id === cmt.id ? [] : [cmt, ...allR]); }}
@@ -1158,14 +1173,14 @@ const StudyApp: React.FC = () => {
                         const topLevel = activeComments.filter(ac => !ac.reply_to);
                         const replies = activeComments.filter(ac => ac.reply_to);
                         const renderComment = (ac: Comment, indent: boolean) => {
-                            const isShen = ac.from_who === 'ai' || ac.from_who === 'AI';
+                            const isShen = ac.from_who.toLowerCase() === 'ai' || ac.from_who.toLowerCase() === aiName.toLowerCase();
                             const color = isShen ? c.shenColor : c.tongColor;
                             const bg = isShen ? c.shenBg : c.tongBg;
                             return (
                                 <div key={ac.id} style={{ marginLeft: indent ? 28 : 0, marginBottom: 12, paddingBottom: 12, borderBottom: indent ? 'none' : `1px solid ${c.primaryBorder}` }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                                        <span style={{ width: 24, height: 24, borderRadius: '50%', background: bg, border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color }}>{ac.from_who.charAt(0)}</span>
-                                        <span style={{ fontSize: 12, fontWeight: 600, color }}>{ac.from_who}</span>
+                                        <span style={{ width: 24, height: 24, borderRadius: '50%', background: bg, border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color }}>{displayName(ac.from_who).charAt(0)}</span>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color }}>{displayName(ac.from_who)}</span>
                                         <span style={{ fontSize: 10, color: '#ccc' }}>{ac.created_at?.slice(0, 16).replace('T', ' ')}</span>
                                     </div>
                                     {ac.selected_text && (
@@ -1193,7 +1208,7 @@ const StudyApp: React.FC = () => {
                     })()}
                     {replyingTo && (
                         <div style={{ marginTop: 8, padding: '10px 12px', background: c.primaryBg, borderRadius: 14, border: `1px solid ${c.primaryBorder}` }}>
-                            <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>回复 {replyingTo.from_who}：{replyingTo.content.slice(0, 30)}{replyingTo.content.length > 30 ? '…' : ''}</div>
+                            <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>回复 {displayName(replyingTo.from_who)}：{replyingTo.content.slice(0, 30)}{replyingTo.content.length > 30 ? '…' : ''}</div>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="写回复…" style={{ flex: 1, border: `1px solid ${c.primaryBorder}`, borderRadius: 10, padding: '6px 12px', fontSize: 13, outline: 'none' }} onKeyDown={e => e.key === 'Enter' && handleAddComment()} />
                                 <button onClick={handleAddComment} style={{ background: c.primary, color: '#fff', border: 'none', borderRadius: 10, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>发送</button>
@@ -1312,6 +1327,23 @@ const StudyApp: React.FC = () => {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Settings overlay */}
+            {showSettings && (
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)', zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                    onClick={() => setShowSettings(false)}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 20, padding: '24px 22px', width: '100%', maxWidth: 340, boxShadow: '0 8px 40px rgba(0,0,0,0.15)' }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: c.primaryDark, marginBottom: 18 }}>设置 Settings</div>
+                        <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>我的名字 My Name</label>
+                        <input value={humanName} onChange={e => { setHumanName(e.target.value); localStorage.setItem('coread-human-name', e.target.value); }}
+                            style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1px solid ${c.primaryBorder}`, fontSize: 14, marginBottom: 16, outline: 'none' }} />
+                        <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>AI的名字 AI Name</label>
+                        <input value={aiName} onChange={e => { setAiName(e.target.value); localStorage.setItem('coread-ai-name', e.target.value); }}
+                            style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1px solid ${c.primaryBorder}`, fontSize: 14, marginBottom: 20, outline: 'none' }} />
+                        <button onClick={() => setShowSettings(false)} style={{ width: '100%', padding: '10px 0', borderRadius: 14, background: c.primary, border: 'none', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>完成</button>
+                    </div>
+                </div>
             )}
 
             {/* Upload overlay */}
