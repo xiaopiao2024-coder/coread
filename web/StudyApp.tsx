@@ -220,7 +220,8 @@ const StudyApp: React.FC = () => {
                 const r = await fetch(`/v1/books/${activeBook.id}/new-replies?since=${lastSeen}`);
                 if (r.ok) {
                     const d = await r.json();
-                    setNewReplies(d.replies?.length ? d.replies : []);
+                    const aiOnly = (d.replies || []).filter((r: any) => r.from_who.toLowerCase() !== humanName.toLowerCase());
+                    setNewReplies(aiOnly.length ? aiOnly : []);
                 }
             } catch {}
         };
