@@ -67,7 +67,7 @@ const STUDY_THEME_CSS = `
 }
 `;
 
-const READER_PAGE_PADDING = '56px 28px calc(32px + env(safe-area-inset-bottom))';
+const READER_PAGE_PADDING = '56px 28px calc(24px + env(safe-area-inset-bottom))';
 const READER_VERTICAL_PADDING_STATIC = 88;
 function getSafeAreaBottom(): number {
     if (typeof document === 'undefined') return 0;
@@ -454,6 +454,7 @@ const StudyApp: React.FC = () => {
 
     const readerContentWidth = Math.max(1, readerSize.width - READER_HORIZONTAL_PADDING);
 
+    const paginationCacheKey = activeBook ? `pagebreaks-${activeBook.id}-${readerContentWidth}-${readerSize.height}` : '';
     const imgHeightCache = useRef<Map<string, number>>(new Map());
 
     const buildMeasureBlock = (para: Paragraph, sourceIdx: number, start: number, end: number) => {
@@ -526,6 +527,30 @@ const StudyApp: React.FC = () => {
             const maxHeight = Math.max(100, readerSize.height - 8);
             setPageHeight(readerSize.height);
 
+            // Try cache first
+            if (paginationCacheKey) {
+                try {
+                    const cached = localStorage.getItem(paginationCacheKey);
+                    if (cached) {
+                        const { breaks: cachedBreaks, paraCount } = JSON.parse(cached);
+                        if (paraCount === allParas.length && Array.isArray(cachedBreaks) && cachedBreaks.length > 0) {
+                            setPageBreaks(cachedBreaks);
+                            setTotalPages(Math.max(1, cachedBreaks.length));
+                            if (!suppressPageJumpRef.current) {
+                                const anchorIdx = savedParaIdxRef.current ?? currentParaIdxRef.current ?? allParas[0]?.idx ?? 0;
+                                const pi = allParas.findIndex(p => p.idx >= anchorIdx);
+                                let targetPage = 0;
+                                if (pi >= 0) { for (let i = cachedBreaks.length - 1; i >= 0; i--) if (cachedBreaks[i].paraIndex <= pi) { targetPage = i; break; } }
+                                setPage(Math.max(1, Math.min(cachedBreaks.length, targetPage + 1)));
+                            }
+                            savedParaIdxRef.current = null;
+                            setReadingLoading(false);
+                            return;
+                        }
+                    }
+                } catch {}
+            }
+
             const breaks: PageBreak[] = [{ paraIndex: 0, offset: 0 }];
             let paraIndex = 0;
             let offset = 0;
@@ -591,6 +616,9 @@ const StudyApp: React.FC = () => {
             if (cancelled) return;
             setPageBreaks(breaks);
             setTotalPages(Math.max(1, breaks.length));
+            if (paginationCacheKey) {
+                try { localStorage.setItem(paginationCacheKey, JSON.stringify({ breaks, paraCount: allParas.length })); } catch {}
+            }
             if (!suppressPageJumpRef.current) {
                 const anchorIdx = savedParaIdxRef.current ?? currentParaIdxRef.current ?? allParas[0]?.idx ?? 0;
                 const targetPage = (() => {
@@ -1063,12 +1091,12 @@ const StudyApp: React.FC = () => {
                 ) : (
                     /* Reading Mode — immersive, no card border */
                     <>
-                        {readingLoading && allParas.length === 0 ? (
+                        {readingLoading ? (
                             <div style={{ textAlign: 'center', padding: '40px 0', color: '#bbb', fontSize: 14 }}>加载中...</div>
                         ) : allParas.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '40px 0', color: '#bbb', fontSize: 14 }}>这一页没有内容</div>
                         ) : (
-                            <div data-page-content style={{ padding: READER_PAGE_PADDING, height: '100%', minHeight: pageHeight || undefined, boxSizing: 'border-box', overflow: 'hidden' }}>
+                            <div data-page-content style={{ padding: READER_PAGE_PADDING, minHeight: pageHeight || undefined, boxSizing: 'border-box', overflow: 'hidden' }}>
                                 {pageFragments.map((frag, visibleIndex) => {
                                     const original = allParas[frag.sourceIdx] || frag;
                                     const heading = isHeading(original.content) && !frag.isPartialStart;

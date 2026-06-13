@@ -106,8 +106,8 @@ web/
   StudyApp.tsx     — React前端（分页阅读器 + 批注）
   api.ts           — API客户端
   app.tsx          — 入口
-public/            — 构建产物（vite build生成）
-data/              — SQLite数据库 + 书籍图片（gitignore）
+public/            — 构建产物（vite build生成，已提交方便直接部署）
+data/              — SQLite数据库 + 书籍图片（gitignore，不入库）
 ```
 
 ---
