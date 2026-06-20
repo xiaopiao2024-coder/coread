@@ -152,7 +152,15 @@ const StudyApp: React.FC = () => {
     const [showBar, setShowBar] = useState(false);
     const [humanName, setHumanName] = useState(() => localStorage.getItem('coread-human-name') || 'human');
     const [aiName, setAiName] = useState(() => localStorage.getItem('coread-ai-name') || 'AI');
+    const [fontSize, setFontSize] = useState(() => parseInt(localStorage.getItem('coread-font-size') || '16'));
     const [showSettings, setShowSettings] = useState(false);
+    const adjustFontSize = (delta: number) => {
+        setFontSize(prev => {
+            const next = Math.max(12, Math.min(24, prev + delta));
+            localStorage.setItem('coread-font-size', String(next));
+            return next;
+        });
+    };
     const displayName = (from: string) => {
         const lower = from.toLowerCase();
         if (lower === 'human' || lower === humanName.toLowerCase()) return humanName;
@@ -454,7 +462,7 @@ const StudyApp: React.FC = () => {
 
     const readerContentWidth = Math.max(1, readerSize.width - READER_HORIZONTAL_PADDING);
 
-    const paginationCacheKey = activeBook ? `pagebreaks-${activeBook.id}-${readerContentWidth}-${readerSize.height}` : '';
+    const paginationCacheKey = activeBook ? `pagebreaks-${activeBook.id}-${readerContentWidth}-${readerSize.height}-${fontSize}` : '';
     const imgHeightCache = useRef<Map<string, number>>(new Map());
 
     const buildMeasureBlock = (para: Paragraph, sourceIdx: number, start: number, end: number) => {
@@ -477,7 +485,7 @@ const StudyApp: React.FC = () => {
             const displayText = stripHeading(para.content).slice(start, end);
             const inner = document.createElement('div');
             inner.textContent = displayText || ' ';
-            inner.style.fontSize = `${chapterTitle ? 18 : para.content.trim().startsWith('# ') ? 17 : para.content.trim().startsWith('## ') ? 16 : 14}px`;
+            inner.style.fontSize = `${chapterTitle ? fontSize + 4 : para.content.trim().startsWith('# ') ? fontSize + 3 : para.content.trim().startsWith('## ') ? fontSize + 2 : fontSize}px`;
             inner.style.lineHeight = String(chapterTitle ? 2.2 : 1.85);
             inner.style.letterSpacing = `${chapterTitle ? 1 : 0.3}px`;
             inner.style.textIndent = heading || chapterTitle || start > 0 ? '0' : '1.5em';
@@ -634,7 +642,7 @@ const StudyApp: React.FC = () => {
         };
         run();
         return () => { cancelled = true; };
-    }, [mode, allParas, readerContentWidth, readerSize.height]);
+    }, [mode, allParas, readerContentWidth, readerSize.height, fontSize]);
 
     useEffect(() => {
         if (allParas.length === 0 || pageBreaks.length === 0) {
@@ -1126,7 +1134,7 @@ const StudyApp: React.FC = () => {
                                     return (
                                         <div key={`${frag.idx}-${frag.startOffset}-${frag.endOffset}`} style={{ marginBottom: chapterTitle ? CHAPTER_GAP_BOTTOM : PARA_GAP, marginTop: chapterTitle && visibleIndex > 0 ? CHAPTER_GAP_TOP : 0 }}>
                                             <div data-para-idx={frag.idx} data-frag-start={frag.startOffset} data-frag-end={frag.endOffset} style={{
-                                                fontSize: chapterTitle ? 18 : original.content.trim().startsWith('# ') ? 17 : original.content.trim().startsWith('## ') ? 16 : 14,
+                                                fontSize: chapterTitle ? fontSize + 4 : original.content.trim().startsWith('# ') ? fontSize + 3 : original.content.trim().startsWith('## ') ? fontSize + 2 : fontSize,
                                                 lineHeight: chapterTitle ? 2.2 : 1.85, color: heading ? '#222' : '#333',
                                                 letterSpacing: chapterTitle ? 1 : 0.3, textIndent: (heading || chapterTitle || frag.isPartialStart) ? 0 : '1.5em',
                                                 fontWeight: chapterTitle ? 800 : heading ? 700 : 400, marginBottom: heading ? 4 : 0,
@@ -1357,6 +1365,17 @@ const StudyApp: React.FC = () => {
                         {/* Bottom row: center page info, right function buttons */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                             <span style={{ fontSize: 12, color: '#aaa' }}>{page} / {totalPages}</span>
+                            <div style={{ position: 'absolute', left: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button onClick={() => adjustFontSize(-2)} disabled={fontSize <= 12}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', opacity: fontSize <= 12 ? 0.3 : 1 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#666' }}>A</span>
+                                </button>
+                                <span style={{ fontSize: 10, color: '#aaa', minWidth: 20, textAlign: 'center' }}>{fontSize}</span>
+                                <button onClick={() => adjustFontSize(2)} disabled={fontSize >= 24}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', opacity: fontSize >= 24 ? 0.3 : 1 }}>
+                                    <span style={{ fontSize: 16, fontWeight: 700, color: '#666' }}>A</span>
+                                </button>
+                            </div>
                             <div style={{ position: 'absolute', right: 0, display: 'flex', gap: 16 }}>
                                 <button onClick={() => setShowToc(true)}
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
