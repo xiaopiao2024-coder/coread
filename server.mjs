@@ -17,8 +17,23 @@ const MIME = {
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
 
+// Webhook通知
+const WEBHOOK_URL = process.env.COREAD_WEBHOOK_URL || '';
+
+async function notifyWebhook(comment) {
+  if (!WEBHOOK_URL || comment.from_who === '克') return;
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(comment)
+    });
+    console.log(`📤 Webhook sent: ${comment.from_who}`);
+  } catch (e) { console.error('Webhook failed:', e); }
+}
+
 const server = http.createServer(async (req, res) => {
-  const handled = await handleRequest(req, res, { port: PORT });
+  const handled = await handleRequest(req, res, { port: PORT, onComment: notifyWebhook });
   if (handled) return;
 
   // Serve static files from public/
